@@ -1690,6 +1690,28 @@ def _shape_as_tensor(context, node):
     context.add(shape_node, node.name)
 
 
+@register_torch_op
+def view_as(context, node):
+    inputs = _get_inputs(context, node, expected=2)
+    x = inputs[0]
+    shape = inputs[1].shape
+
+    if isinstance(shape, list) and all(
+        [isinstance(dim, Var) and len(dim.shape) == 0 for dim in shape]
+    ):
+        shape = mb.concat(values=shape, axis=0)
+
+    shape = mb.cast(x=shape, dtype="int32")
+
+    if types.is_complex(x.dtype):
+        real, imag = (mb.reshape(x=x, shape=shape, name=node.name) for x in (mb.complex_real(data=x), mb.complex_imag(data=x)))
+        view = mb.complex(real_data=real, imag_data=imag, name=node.name)
+    else:
+        view = mb.reshape(x=x, shape=shape, name=node.name)
+
+    context.add(view)
+    
+
 @register_torch_op(torch_alias=["view_copy", "reshape"])
 def view(context, node):
     inputs = _get_inputs(context, node, expected=2)
